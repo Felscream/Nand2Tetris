@@ -18,5 +18,13 @@ CHIP DMux8Way {
     OUT a, b, c, d, e, f, g, h;
 
     PARTS:
-    //// Replace this comment with your code.
+    // nullify input for a b c and d if sel[2] is 1
+    Not(in=sel[2], out=selectLow);
+    And(a=in, b=selectLow, out=inLow);
+
+    // nullify input for e f g and h if sel[2] is 0
+    And(a=in, b=sel[2], out=inHigh);
+
+    DMux4Way(in=inLow, sel=sel[0..1], a=a, b=b, c=c, d=d);
+    DMux4Way(in=inHigh, sel=sel[0..1], a=e, b=f, c=g, d=h);
 }

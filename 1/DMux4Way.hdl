@@ -14,5 +14,13 @@ CHIP DMux4Way {
     OUT a, b, c, d;
 
     PARTS:
-    //// Replace this comment with your code.
+    // nullify a and b if MSB is 1
+    Not(in=sel[1], out=notSel1);
+    And(a=in, b=notSel1, out=in0);
+    
+    // nullify c and d if MSB is 0
+    And(a=in, b=sel[1], out=in1);
+
+    DMux(in=in0, sel=sel[0], a=a, b=b);
+    DMux(in=in1, sel=sel[0], a=c, b=d);
 }
