@@ -32,5 +32,81 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-	//// Replace this comment with your code.
+    // instruction : 1xxaccccccdddjjj
+    //               5432109876543210
+    // instruction : 1xxaccccccADMjjj
+
+    // The A register has two sources : the ALU's output or the given instruction
+    // Select the input instructions if :
+    // it's an A instruction (index 15 = 0)
+    // Otherwise load the ALU's output
+    Not(in=instruction[15], out=isAInstruction);
+    Mux16(a=aluOut, b=instruction, sel=isAInstruction, out=aIn);
+
+    // A Register, also outputs the target address in RAM
+    // The A register is written into if we have an A instruction (left most bit = 0),
+    // or a C instruction with the A as the destination
+    // Otherwise we want it to output it's current content
+    Or(a=instruction[5], b=isAInstruction, out=writeA);
+    ARegister(in=aIn, load=writeA, out=aRegOut, out[0..14]=addressM);
+
+    // write to M if we have a C instruction, and M is one of the destinations
+    And(a=instruction[15], b=instruction[3], out=writeM);
+    
+    // if 'a', feed the A Register into the ALU
+    // else take the content of RAM
+    Mux16(a=aRegOut, b=inM, sel=instruction[12], out=mAluIn);
+
+    ALU(x=dOut, y=mAluIn, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=aluOut, out=outM, zr=zr, ng=ng);
+    
+    //write into D register if we have a C instruction and it is one of the target
+    And(a=instruction[4], b=instruction[15], out=writeD);
+    DRegister(in=aluOut, load=writeD, out=dOut);
+
+    // We need to jump to the address in the A register
+    // if we receive a C instruction
+    // if any jump condition (3 lsb) is true by setting PC to out output of the A register
+    // otherwise, we go to the next instruction by incrementing the current value of PC
+    // conditions are compared with the output of the ALU 
+    // zr indicates if the ALU's output is = 0
+    // ng indicates if the ALU's output is < 0
+    // jjj
+    // 000 no jump
+    // 001 jump if > 0
+    // 010 jump if = 0
+    // 011 jump if >= 0
+    // 100 jump if < 0
+    // 101 jump if != 0
+    // 110 jump if <= 0
+    // 111 jump
+
+    Not(in=zr, out=notZero); // != 0
+    Not(in=ng, out=gte); // >= 0
+    And(a=notZero, b=gte, out=gt); // > 0
+    And(a=notZero, b=ng, out=lt); // < 0
+    Or(a=zr, b=ng, out=lte); // <= 0
+
+    // find the jump condition to apply by demultiplexing a true signal by the jjj bits
+    // the a output can be ignored
+    DMux8Way(in=true, sel[0]=instruction[0], sel[1]=instruction[1], sel[2]=instruction[2], a=isNoJump, b=isJgt, c=isJeq, d=isJge, e=isJlt, f=isJne, g=isJle, h=isJmp);
+
+    // test every jump condition
+    // with DMux output
+    And(a=isJgt, b=gt, out=jgt);
+    And(a=isJeq, b=zr, out=jeq);
+    And(a=isJge, b=gte, out=jge);
+    And(a=isJlt, b=lt, out=jlt);
+    And(a=isJne, b=notZero, out=jne);
+    And(a=isJle, b=lte, out=jle);
+
+    // check if any jump condition is true
+    Or8Way(in[0]=false, in[1]=jgt, in[2]=jeq, in[3]=jge, in[4]=jlt, in[5]=jne, in[6]=jle, in[7]=isJmp, out=canJump);
+
+    // jump if we have a C instruction
+    And(a=instruction[15], b=canJump, out=jump);
+
+    // If we are jumping, we need to load the address of the next instruction stored in the A register
+    // Otherwise increment the current value to go to the next instruction
+    Not(in=jump, out=next);
+	PC(in=aRegOut , inc=next, load=jump, reset=reset, out[0..14]=pc);
 }
