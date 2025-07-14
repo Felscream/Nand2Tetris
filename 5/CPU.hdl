@@ -53,8 +53,8 @@ CHIP CPU {
     // write to M if we have a C instruction, and M is one of the destinations
     And(a=instruction[15], b=instruction[3], out=writeM);
     
-    // if 'a', feed the A Register into the ALU
-    // else take the content of RAM
+    // if 'a', feed inM into the ALU
+    // else take the content of the A register
     Mux16(a=aRegOut, b=inM, sel=instruction[12], out=mAluIn);
 
     ALU(x=dOut, y=mAluIn, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6], out=aluOut, out=outM, zr=zr, ng=ng);
